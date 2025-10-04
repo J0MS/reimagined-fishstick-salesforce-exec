@@ -1,0 +1,86 @@
+version: "3.7"
+
+services:
+  rct_api:
+    user: "appuser:appuser"
+    depends_on:
+      - redis
+    build:
+      target: production
+      context: .
+    container_name: rct-api
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0   
+      - DOCKER_BUILDKIT=1
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./src:/src/src
+    ports:
+      - 8000:8000
+    command: uvicorn src.main:rct_api --reload --host 0.0.0.0 --port 8000
+
+  worker:
+    #user: "appuser:appuser"
+    depends_on:
+      - rct_api
+      - redis
+    build: .
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    restart: always
+    env_file:
+      - .env    
+    volumes:
+      - ./src:/src/src
+      - ./celery_logs:/src/celery_logs
+    command: celery -A src.src.routers.rct.worker.celery worker -l warning --logfile=/src/celery_logs/celery.log
+
+  redis:
+    image: redis:6-alpine
+
+  rct_api_unit_test:
+    build:
+      target: unit_test
+      context: .
+    container_name: rct_api_unit_test
+#    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./reports/:/src/src/reports
+      - ./tests:/src/src/tests
+    ports:
+      - 8000:8000
+    command: bash -c 'pytest --cov-config=.coveragerc src/tests/unit_test --cov-report term-missing --junitxml=reports/unittest-3.8.xml --cov-report=xml:reports/coverage-3.8.xml --cov-report=html:reports/coverage_report-3.8.xml --cov=src -v -n 3  && pytest --cov-config=.coveragerc src/tests/unit_test --junitxml=reports/pytest-3.8.xml --cov-report term-missing  --cov=src | tee reports/pytest-coverage-3.8.txt' 
+
+
+  rct_api_integration_test:
+    build:
+      target: integration_test
+      context: .
+    container_name: rct_api_integration_test
+#    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./src:/src/src/src
+      - ./tests:/src/src/tests
+    command: pytest --cov-config=.coveragerc --cov=. src/tests/integration_test --junitxml=junit/unittest-3.8.xml -v
+
+
+# Run API with:
+# 1) Installing testops_tools from remote repo:
+# docker-compose build --build-arg JFROG_CONNECTION_STRING && docker-compose up rct_api worker
+# 2) Installing testops_tools from local built package:
+# docker-compose build --build-arg LOCAL_PACKAGE=./testops_tools_random_control_trial_2-1.0-py3-none-any.whl && docker-compose up rct_api worker
+
+
+# Run tests with:
+# docker-compose build --build-arg JFROG_CONNECTION_STRING && docker-compose up rct_api_unit_test
+# docker-compose build --build-arg JFROG_CONNECTION_STRING && time docker-compose up --force-recreate rct_api_integration_test
+
+

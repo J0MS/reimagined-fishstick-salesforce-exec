@@ -1,0 +1,97 @@
+name: cd-kubernetes
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - packages/API/kubernetes/**
+
+env:
+  # job working directory
+  WORKING_DIR: ${{ github.workspace }}/packages/API/kubernetes
+  # azure
+  AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+
+jobs:
+  audit-k8s:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        paths:
+          - packages/API/kubernetes
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          wget -P /tmp https://github.com/Shopify/kubeaudit/releases/download/v0.21.0/kubeaudit_0.21.0_linux_amd64.tar.gz
+          mkdir ~/bin
+          export PATH=$PATH:~/bin
+          tar zxvf /tmp/kubeaudit_0.21.0_linux_amd64.tar.gz -C ~/bin kubeaudit
+          kubeaudit version
+          find ${{ matrix.paths }} -name \*.yml | xargs -n 1 kubeaudit all -f
+
+  apply-dev:
+    needs: [audit-k8s]
+    runs-on: ubuntu-latest
+    environment:
+      name: kubernetes-dev
+    env:
+      RESOURCE_GROUP: ${{ secrets.RESOURCE_GROUP }}
+      CLUSTER_NAME: ${{ secrets.CLUSTER_NAME }}
+    steps:
+    -
+      name: Cancel previous jobs
+      uses: styfle/cancel-workflow-action@0.10.0
+      with:
+        access_token: ${{ github.token }}
+    -
+      uses: actions/checkout@main
+    -
+      name: Set the target Azure Kubernetes Service (AKS) cluster
+      uses: Azure/aks-set-context@v1
+      with:
+        creds: '${{ env.AZURE_CREDENTIALS }}'
+        resource-group: ${{ env.RESOURCE_GROUP }}
+        cluster-name: ${{ env.CLUSTER_NAME }}
+    -
+      name: Apply manifests to AKS
+      uses: Azure/k8s-deploy@v3.1
+      with:
+        token: ${{ github.token }}
+        action: deploy
+        manifests:
+          ${{ env.WORKING_DIR }}
+
+  apply-qa:
+    needs: [apply-dev]
+    runs-on: ubuntu-latest
+    environment:
+      name: kubernetes-qa
+    env:
+      RESOURCE_GROUP: ${{ secrets.RESOURCE_GROUP }}
+      CLUSTER_NAME: ${{ secrets.CLUSTER_NAME }}
+    steps:
+    -
+      name: Cancel previous jobs
+      uses: styfle/cancel-workflow-action@0.10.0
+      with:
+        access_token: ${{ github.token }}
+    -
+      uses: actions/checkout@main
+    - name: Azure login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    -
+      name: Apply manifests to AKS
+      uses: Azure/k8s-deploy@v4
+      with:
+        resource-group: ${{ env.RESOURCE_GROUP }}
+        name: ${{ env.CLUSTER_NAME }}
+        token: ${{ github.token }}
+        private-cluster: true
+        action: deploy
+        strategy: basic
+        manifests:
+          ${{ env.WORKING_DIR }}
