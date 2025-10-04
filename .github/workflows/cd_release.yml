@@ -1,0 +1,67 @@
+# This workflow is used to generate the changelog related to the repo state
+name: "CD: Release"
+
+on:
+  # event to trigger workflow manually
+  workflow_dispatch:
+
+  # event to trigger workflow chronologically
+  schedule:
+          #  ┌───────────── minute (0 - 59)
+          #  │ ┌───────────── hour (0 - 23)
+          #  │ │ ┌───────────── day of the month (1 - 31)
+          #  │ │ │  ┌───────────── month (1 - 12)
+          #  │ │ │  │ ┌───────────── day of the week (0 - 6)
+          #  │ │ │  │ │                                   
+          #  │ │ │  │ │
+          #  │ │ │  │ │
+          #  * * *  * *
+    - cron: "5 6 28 * *"
+
+jobs:
+  # call reusable semantic version from ab-inbev-labs/ml-platform-workflows repository
+  call_reusable_semantic_versioning:
+    name: CD
+    uses: ab-inbev-labs/ml-platform-workflows/.github/workflows/reusable_semantic_version.yml@v0.4.2
+    with:
+      tag_prefix: v
+      module_path: "."
+    secrets:
+      GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # call reusable create tag release from ab-inbev-labs/ml-platform-workflows repository
+  call_reusable_create_tag:
+    name: CD
+    needs: [call_reusable_semantic_versioning]
+    uses: ab-inbev-labs/ml-platform-workflows/.github/workflows/reusable_create_tag.yml@v0.4.2
+    with:
+      tag: ${{ needs.call_reusable_semantic_versioning.outputs.version }}
+      tag_message: "Releasing version ${{ needs.call_reusable_semantic_versioning.outputs.version }}"
+      on_tag_exists: skip
+    secrets:
+      GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # call reusable changelog generator from ab-inbev-labs/ml-platform-workflows repository
+  call_reusable_changelog_generator:
+    name: CD
+    needs: [call_reusable_semantic_versioning, call_reusable_create_tag]
+    uses: ab-inbev-labs/ml-platform-workflows/.github/workflows/reusable_changelog_generator_polyrepo.yml@v0.4.2
+    with:
+      fromTag: v${{ needs.call_reusable_semantic_versioning.outputs.prev_version }}
+      toTag: ${{ needs.call_reusable_semantic_versioning.outputs.version }}
+    secrets:
+      GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # call reusable create release from ab-inbev-labs/ml-platform-workflows repository
+  call_reusable_create_release:
+    name: CD
+    needs: [call_reusable_semantic_versioning, call_reusable_changelog_generator]
+    uses: ab-inbev-labs/ml-platform-workflows/.github/workflows/reusable_create_release.yml@v0.4.2
+    with:
+      project_name: repository
+      project_dir: "."
+      version: ${{ needs.call_reusable_semantic_versioning.outputs.sem_version }}
+      changelog: ${{ needs.call_reusable_changelog_generator.outputs.changelog }}
+      tag: ${{ needs.call_reusable_semantic_versioning.outputs.version }}
+    secrets:
+      GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}

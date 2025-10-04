@@ -1,0 +1,75 @@
+name: Commit and PR Title Validation
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  validate-pr-title:
+    name: Validate PR Title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR Title Format
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PATTERN="^SF#[0-9]+ (feat|fix|test|docs|chore|style|refactor|ci|cd|build|perf|revert)\b"
+          
+          if [[ ! "$PR_TITLE" =~ $PATTERN ]]; then
+            echo "❌ PR title does not match the required pattern!"
+            echo "Current title: $PR_TITLE"
+            echo ""
+            echo "Required pattern: SF#<number> <type>"
+            echo "Valid types: feat, fix, test, docs, chore, style, refactor, ci, cd, build, perf, revert"
+            echo ""
+            echo "Example: SF#1234 feat: add new feature"
+            exit 1
+          fi
+          
+          echo "✅ PR title is valid: $PR_TITLE"
+
+  validate-commits:
+    name: Validate Commit Messages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Check Commit Messages
+        run: |
+          PATTERN="^SF#[0-9]+ (feat|fix|test|docs|chore|style|refactor|ci|cd|build|perf|revert)\b"
+          INVALID_COMMITS=()
+          
+          # Get all commits in the PR
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          
+          # Iterate through each commit
+          for commit in $(git rev-list $BASE_SHA..$HEAD_SHA); do
+            COMMIT_MSG=$(git log --format=%s -n 1 $commit)
+            
+            if [[ ! "$COMMIT_MSG" =~ $PATTERN ]]; then
+              INVALID_COMMITS+=("$commit: $COMMIT_MSG")
+            fi
+          done
+          
+          # Report results
+          if [ ${#INVALID_COMMITS[@]} -ne 0 ]; then
+            echo "❌ Found ${#INVALID_COMMITS[@]} invalid commit message(s):"
+            echo ""
+            for invalid in "${INVALID_COMMITS[@]}"; do
+              echo "  - $invalid"
+            done
+            echo ""
+            echo "Required pattern: SF#<number> <type>: <description>"
+            echo "Valid types: feat, fix, test, docs, chore, style, refactor, ci, cd, build, perf, revert"
+            echo ""
+            echo "Examples:"
+            echo "  - SF#1234 feat: add user authentication"
+            echo "  - SF#5678 fix: resolve null pointer exception"
+            exit 1
+          fi
+          
+          echo "✅ All commit messages are valid!"
