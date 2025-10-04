@@ -1,6 +1,6 @@
-# Random Control Trial API Dockerfile.
+# Sales Force API Dockerfile.
 #
-#Copyright 2024 Anheuser Busch InBev Inc.
+#Copyright 2025 Salesforce Inc.
 #
 #Unless required by applicable law or agreed to in writing, software
 #distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,43 +25,13 @@ RUN usermod -aG appuser appuser
 # Change the ownership of the working directory to the non-root user
 RUN chown -R appuser:appuser /src
 
-# Install OpenJDK-17
-# RUN add-apt-repository ppa:openjdk-r/ppa
-#RUN apt-get update && \
-#    apt-get install -y openjdk-17-jre && \
-#    apt-get clean;
-# Set the JAVA_HOME environment variable
-#ENV JAVA_HOME /usr/lib/jvm/java-17-openjdk-amd64
-#ENV PATH $JAVA_HOME/bin:$PATH
-
-# Install OpenJDK 17 (compatible with PySpark 3.3.0)
-RUN apt-get update && \
-    apt-get install -y openjdk-17-jre && \
-    apt-get clean;
-
-# Set JAVA_HOME environment variable explicitly
-#ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-#ENV PATH="$JAVA_HOME/bin:$PATH"
-
-# Dynamically set JAVA_HOME
-RUN export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java)))) && \
-    echo "JAVA_HOME is set to $JAVA_HOME"
-
-# Verify Java installation
-RUN java -version
-
 # Set PYTHONPATH environment variable
 ENV PYTHONPATH="/usr/lib/python3.9/site-packages"
-ENV PYSPARK_SUBMIT_ARGS "--master local[*] --executor-memory 16g --driver-memory 16g pyspark-shell"
-#ENV PYSPARK_SUBMIT_ARGS="--master local[2] pyspark-shell"
 
 # pyodbc dependencies
 RUN apt-get update && \
   apt-get install -y gcc g++ libgssapi-krb5-2 curl jq && \
   apt-get clean all
-
-#Installing Pyspark connectors
-RUN printf "INFO: Installing Pyspark connectors \n"
 
 WORKDIR /src
 COPY ./requirements.txt ./requirements.txt
@@ -77,45 +47,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
    --mount=type=bind,source=requirements.txt,target=requirements.txt \
    python -m pip install -r requirements.txt
 
-# Test PySpark with a simple command
-RUN python -c "from pyspark.sql import SparkSession; spark = SparkSession.builder.getOrCreate(); print(spark.version)"
 
 #RUN pip install --no-cache-dir -r /src/requirements.txt
 RUN rm -r ~/.cache/pip/selfcheck/
 
-
-# Setting  build arguments
-ARG LOCAL_PACKAGE
-ARG JFROG_CONNECTION_STRING
-
-# Loading build arguments from .env file
-RUN echo "JFROG_CREDENTIALS = $JFROG_CREDENTIALS"
-
-# If LOCAL_PACKAGE build argument was provided, copy the whl file
-COPY $LOCAL_PACKAGE ./
-
-# Determine the origin of testops_tools_random_control_trial_2 package (remote or local)
-RUN if [ -z "$LOCAL_PACKAGE" ]; then \
-        printf "INFO: Installing remote built package \n" && \
-        # Building JFROG_CONNECTION_STRING, loading JFROG_CREDENTIALS from .env file
-        #JFROG_CONNECTION_STRING=https://$JFROG_CREDENTIALS@abinbev.jfrog.io/artifactory/api/pypi/abia-local-light-house/simple && \
-        # Building the testops_query file
-        echo 'items.find({"@pypi.name":{"$eq":"testops-tools-random-control-trial-2"}}).sort({"$asc": ["updated"]})' > testops_query.aql && \
-        # Sending request to JFrog platform to get the latest package path (like package/version)
-        #latest_package_path=$(curl -u $JFROG_CREDENTIALS -X POST https://abinbev.jfrog.io/artifactory/api/search/aql -H "content-type: text/plain" -d @testops_query.aql | jq -r '.results[-1].path'); latest_package_version="${latest_package_path#*/}"; echo $latest_package_version > latest_package_version && \
-        # Capturing the latest package version
-        printf "INFO: Latest package version=$(cat latest_package_version) \n" && \
-        # Installing JFrog repository
-        pip install --no-cache-dir --index-url $JFROG_CONNECTION_STRING --extra-index-url https://pypi.org/simple testops_tools_random_control_trial_2==0.8.4 testops_tools_outliers_treatment==0.8.4; \
-    else \
-        printf "INFO: Installing locally built package $LOCAL_PACKAGE \n" && pip3 install $LOCAL_PACKAGE; \
-    fi
-
-# Create folder to save celery logs
-RUN mkdir -p celery_logs
-
-# Change the ownership of the celery_logs directory to the non-root user
-RUN chown -R appuser:appuser /src/celery_logs
 
 # -----------------------------------------------------------------------------------------------------------------------------------------
 FROM base AS production
@@ -125,7 +60,7 @@ USER appuser
 
 COPY ./src ./src
 EXPOSE 8000
-CMD ["uvicorn", "src.main:rct_api", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.main:api", "--host", "0.0.0.0", "--port", "8000"]
 
 # -----------------------------------------------------------------------------------------------------------------------------------------
 
