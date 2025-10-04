@@ -3,7 +3,7 @@
 # In the future, it may make sense to create User Groups but we can hard-code Git Hub usernames for now
 
 # Base reviewers (if no directory specified, this will run) (* is wildcard)
-*  @ab-inbev-analytics/testops_admins
+*  @J0MS
 
 # directory syntax (just as an example, can delete if you don't want this in the Repo)
 # /observability/packages/ @megelonabi
