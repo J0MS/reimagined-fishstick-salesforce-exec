@@ -30,7 +30,8 @@ from fastapi import (
 #import numpy as np
 
 #from ...models.validators.response_validator import RCTResponseValidator, RCTOutputSchema
-#from ...models.rct_model import ExperimentData
+from ...models.request.request_model import LeadScoringRequest
+from ...models.responses.response_model import LeadScoringResponse
 from ...config.config import settings, LoggingFormatter, APIMetadata, APIPolicies
 from ..errors import Exceptions
 
@@ -54,8 +55,9 @@ class ComputeLeads:
 
 
     async def compute(
+        scoring_request: LeadScoringRequest,
         request: Request = None,
-    ):
+    ) -> LeadScoringResponse:
 
         """
         Compute RCT design table
@@ -84,11 +86,23 @@ class ComputeLeads:
         try:
             # Inputs
 
-            logger.info(f"Input exp_obj:")
+            logger.info(f"Input exp_obj:{LeadScoringRequest}")
 
             try:
                 experiment_id = "RANDOM"
-                response = {"experiment_id": experiment_id}
+
+                response = {
+                            "STATUS_CODE": 200,
+                            "STATE": experiment_id,
+                            "EXECUTION_ID": 100,
+                            "INFERENCE_REPORT": {"lead_score": 5,
+                                                 "confidence": 0.87,
+                                                 "probabilities": {"score_1": 0.02,"score_2": 0.03,"score_3": 0.05,"score_4": 0.03,"score_5": 0.87},
+                                                 "model_info": {"model_name": "lead-scoring-xgboost","version": "3","stage": "Production"},
+                                                 "prediction_timestamp": "2025-10-04T12:00:00Z"
+                                                 }
+                            }
+
                 return response
 
             except Exception as e:

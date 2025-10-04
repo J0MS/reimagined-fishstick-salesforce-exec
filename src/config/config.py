@@ -10,7 +10,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 import logging
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 from enum import Enum
 from dataclasses import dataclass, field
 from typing import List, Dict

@@ -34,6 +34,7 @@ from fastapi import (
 #from ...models.validators.response_validator import RCTResponseValidator, RCTOutputSchema
 ##from ...utils.rct_utils import RCTTools
 #from .worker import run_rct, celery
+from ...models.responses.response_model import LeadScoringResponse
 from ...config.config import settings, LoggingFormatter, APIMetadata, APIPolicies
 
 from ..errors import Exceptions
@@ -72,9 +73,9 @@ class ComputeRouter:
         self.router.add_api_route("/v{}.{}/compute".format(APIMetadata.api_major, APIMetadata.api_minor),
                                   ComputeLeads.compute,
                                   methods=["POST"],
-                                  #response_model=RCTGatewayResponse,
-                                  response_description="Design table: Table with experimental units randomized",
-                                  summary="Endpoint to generate randomized experimental units",
+                                  response_model=LeadScoringResponse,
+                                  response_description="Lead scoring report for each lead",
+                                  summary="Endpoint to generate lead scoring report",
                                   tags=["core"]
                                   # dependencies=[Depends(verify_access)],
                                   )

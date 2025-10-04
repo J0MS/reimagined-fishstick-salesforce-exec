@@ -10,17 +10,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from pydantic import BaseModel
+from ..ml.lead_scoring_model import LeadScoringOutput
+from typing import Dict, List, Optional
+from pydantic import BaseModel, Field, validator, root_validator
 
-class RCTGatewayResponse(BaseModel):
+class LeadScoringResponse(BaseModel):
     """
-    HTTP Response definition for /rct-gateway
+    HTTP Response definition for /compute
     """
 
-    statusCode: int
-    state: str
-    exp_id: int
-    rct_table: bytes
+    STATUS_CODE: int
+    STATE: str
+    EXECUTION_ID: int
+    INFERENCE_REPORT: Optional[LeadScoringOutput] = Field(
+        None,
+        title="lead scoring report",
+        description="Salesforce model leads scoring report",
+    )
+
+    
+    
 
     class Config:
         arbitrary_types_allowed = True

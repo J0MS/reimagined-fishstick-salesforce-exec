@@ -51,8 +51,8 @@ api = FastAPI(
 health = HealthChecker(logger=logger,  state="SUCCESS", response_string="ok")
 api.include_router(health.router)
 
-ml_router = ComputeRouter( logger=logger)
-api.include_router(ml_router.router)
+compute_router = ComputeRouter( logger=logger)
+api.include_router(compute_router.router)
 #
 #
 #
