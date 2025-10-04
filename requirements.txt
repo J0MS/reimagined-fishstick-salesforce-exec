@@ -1,0 +1,19 @@
+# Salesforce API
+fastapi==0.95.2
+uvicorn
+python-dotenv
+python-multipart
+pyarrow==14.0.1
+PyJWT==2.8.0
+
+# OLT and RCT package
+#numpy
+scikit-learn
+#scipy
+
+# monitoring
+cryptography>=41.0.0 # not directly required, pinned by Snyk to avoid a vulnerability
+
+
+requests
+#pipenv install opencensus

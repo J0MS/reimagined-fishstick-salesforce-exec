@@ -1,0 +1,6 @@
+id,experiment_id,ex_unit_id,ex_factor_1,ex_factor_2,ex_factor_3,ex_factor_4,ex_factor_5,block_factor_1,block_factor_2,block_factor_3,block_factor_4,block_factor_5
+1,1,101,test,No Level,No Level,No Level,No Level,No Level,No Level,No Level,No Level,No Level
+2,2,102,test,No Level,No Level,No Level,No Level,No Level,No Level,No Level,No Level,No Level
+3,3,103,control,No Level,No Level,No Level,No Level,No Level,No Level,No Level,No Level,No Level
+4,4,104,control,No Level,No Level,No Level,No Level,No Level,No Level,No Level,No Level,No Level
+5,5,105,test,No Level,No Level,No Level,No Level,No Level,No Level,No Level,No Level,No Level
