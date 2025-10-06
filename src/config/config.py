@@ -92,6 +92,15 @@ class Settings(BaseSettings):
     INSTRUMENTATION_KEY: str
     JWT_SECRET: str
     ALGORITHM: str
+    MLFLOW_TRACKING_URI : str
+    MODEL_NAME : str
+    MODEL_STAGE : str
+    AWS_ACCESS_KEY_ID: str
+    AWS_SECRET_ACCESS_KEY: str
+    AWS_REGION: str
+    AWS_BUCKET: str
+    BUCKET_PREFIX: str
+
 
     class Config:
         env_file = '.env'

@@ -34,15 +34,14 @@ from mlflow.models.signature import infer_signature
 from mlflow.tracking import MlflowClient
 import json
 from datetime import datetime
+#from ..config.config import settings
 
-# Set MLflow tracking URI (change to your MLflow server)
-# mlflow.set_tracking_uri("http://localhost:5000")  # For remote MLflow server
-# mlflow.set_tracking_uri("sqlite:///mlflow.db")  # For local SQLite database
-mlflow.set_tracking_uri("mlruns")  # For local file-based tracking
+# Set MLflow tracking URI 
+#mlflow.set_tracking_uri(settings.MLFLOW_TRACKING_URI)  # For local file-based tracking
 
 class LeadScoringModel:
     """
-    XGBoost-based Lead Scoring Model (1-5 scale) with MLflow integration
+    XGBoost-based Lead Scoring Model (1-5 scale)
     
     Approach: Ordinal Classification with complete experiment tracking
     - Tracks all experiments, parameters, metrics, and artifacts in MLflow
@@ -55,6 +54,7 @@ class LeadScoringModel:
         self.label_encoder = LabelEncoder()
         self.scaler = StandardScaler()
         self.feature_names = None
+        self.processed_feature_names = None  # ← NUEVO: nombres después del procesamiento
         self.experiment_name = experiment_name
         self.run_id = None
         
@@ -71,10 +71,7 @@ class LeadScoringModel:
         Returns:
             Configured XGBoost classifier
         """
-        
-        if approach == "ordinal":
-            # Ordinal regression approach (RECOMMENDED for 1-5 scoring)
-            model = xgb.XGBClassifier(
+        model = xgb.XGBClassifier(
                 objective='multi:softprob',
                 num_class=5,
                 max_depth=4,
@@ -92,20 +89,6 @@ class LeadScoringModel:
                 n_jobs=-1,
                 eval_metric=['mlogloss', 'merror'],
                 early_stopping_rounds=20
-            )
-        else:
-            model = xgb.XGBClassifier(
-                objective='multi:softmax',
-                num_class=5,
-                max_depth=5,
-                n_estimators=150,
-                learning_rate=0.1,
-                subsample=0.8,
-                colsample_bytree=0.8,
-                reg_alpha=0.3,
-                reg_lambda=1.0,
-                random_state=42,
-                n_jobs=-1
             )
         
         return model
@@ -180,7 +163,7 @@ class LeadScoringModel:
                 for key, value in tags.items():
                     mlflow.set_tag(key, value)
             
-            # Store feature names
+            # Store original feature names
             self.feature_names = X.columns.tolist()
             
             # Log dataset info
@@ -194,6 +177,9 @@ class LeadScoringModel:
             
             # Prepare features
             X_processed = self.prepare_features(X)
+            
+            # Store processed feature names (CRÍTICO)
+            self.processed_feature_names = X_processed.columns.tolist()
             
             # Scale numerical features
             X_scaled = self.scaler.fit_transform(X_processed)
@@ -212,6 +198,52 @@ class LeadScoringModel:
             mlflow.log_param("train_size", len(X_train))
             mlflow.log_param("val_size", len(X_val))
             
+            # ========== CROSS-VALIDATION (ANTES DEL ENTRENAMIENTO FINAL) ==========
+            cv_mean = None
+            cv_std = None
+            
+            if use_cv:
+                print("Running cross-validation...")
+                cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+                
+                # Crear modelo limpio para CV (sin early stopping)
+                cv_model = self.create_model(approach)
+                
+                # Remover parámetros que causan conflictos en CV
+                cv_params = cv_model.get_params()
+                if 'callbacks' in cv_params:
+                    cv_model.set_params(callbacks=None)
+                if 'early_stopping_rounds' in cv_params:
+                    cv_model.set_params(early_stopping_rounds=None)
+                
+                try:
+                    cv_scores = cross_val_score(
+                        cv_model, 
+                        X_scaled, 
+                        y_encoded, 
+                        cv=cv, 
+                        scoring='accuracy',
+                        n_jobs=-1,
+                        verbose=0
+                    )
+                    cv_mean = cv_scores.mean()
+                    cv_std = cv_scores.std()
+                    
+                    mlflow.log_metric("cv_accuracy_mean", cv_mean)
+                    mlflow.log_metric("cv_accuracy_std", cv_std)
+                    
+                    for i, score in enumerate(cv_scores):
+                        mlflow.log_metric(f"cv_fold_{i+1}_accuracy", score)
+                    
+                    print(f"✓ Cross-validation completed: {cv_mean:.4f} (+/- {cv_std:.4f})")
+                    
+                except Exception as e:
+                    print(f"⚠️ Warning: Cross-validation failed: {str(e)}")
+                    print("Continuing without CV metrics...")
+            
+            # ========== ENTRENAMIENTO FINAL CON EARLY STOPPING ==========
+            print("Training final model...")
+            
             # Create model
             self.model = self.create_model(approach)
             
@@ -227,10 +259,17 @@ class LeadScoringModel:
                 verbose=False
             )
             
+            # 🔍 DIAGNÓSTICO DE FEATURES
+            print(f"📊 Feature count check:")
+            print(f"  - Original features: {len(self.feature_names)}")
+            print(f"  - After processing: {len(self.processed_feature_names)}")
+            print(f"  - Model importances: {len(self.model.feature_importances_)}")
+            
             # Log best iteration
             if hasattr(self.model, 'best_iteration'):
                 mlflow.log_metric("best_iteration", self.model.best_iteration)
             
+            # ========== PREDICCIONES Y MÉTRICAS ==========
             # Predictions
             y_pred = self.model.predict(X_val)
             y_pred_proba = self.model.predict_proba(X_val)
@@ -266,22 +305,7 @@ class LeadScoringModel:
             # Log classification report
             mlflow.log_dict(class_report, "classification_report.json")
             
-            # Cross-validation
-            if use_cv:
-                cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-                cv_scores = cross_val_score(
-                    self.model, X_scaled, y_encoded, 
-                    cv=cv, scoring='accuracy'
-                )
-                cv_mean = cv_scores.mean()
-                cv_std = cv_scores.std()
-                
-                mlflow.log_metric("cv_accuracy_mean", cv_mean)
-                mlflow.log_metric("cv_accuracy_std", cv_std)
-                
-                for i, score in enumerate(cv_scores):
-                    mlflow.log_metric(f"cv_fold_{i+1}_accuracy", score)
-            
+            # ========== VISUALIZACIONES ==========
             # Create confusion matrix plot
             cm = confusion_matrix(y_val_scores, y_pred_scores)
             plt.figure(figsize=(10, 8))
@@ -299,24 +323,29 @@ class LeadScoringModel:
             plt.close()
             
             # Feature importance plot
-            importance_df = self.get_feature_importance(top_n=15)
-            plt.figure(figsize=(10, 6))
-            plt.barh(range(len(importance_df)), importance_df['importance'])
-            plt.yticks(range(len(importance_df)), importance_df['feature'])
-            plt.xlabel('Importance')
-            plt.title('Top 15 Most Important Features')
-            plt.gca().invert_yaxis()
-            plt.tight_layout()
+            try:
+                importance_df = self.get_feature_importance(top_n=15)
+                plt.figure(figsize=(10, 6))
+                plt.barh(range(len(importance_df)), importance_df['importance'])
+                plt.yticks(range(len(importance_df)), importance_df['feature'])
+                plt.xlabel('Importance')
+                plt.title('Top 15 Most Important Features')
+                plt.gca().invert_yaxis()
+                plt.tight_layout()
+                
+                importance_path = "feature_importance.png"
+                plt.savefig(importance_path)
+                mlflow.log_artifact(importance_path)
+                plt.close()
+                
+                # Log feature importance as dict
+                importance_dict = importance_df.set_index('feature')['importance'].to_dict()
+                mlflow.log_dict(importance_dict, "feature_importance.json")
+                
+            except Exception as e:
+                print(f"⚠️ Warning: Could not generate feature importance plot: {str(e)}")
             
-            importance_path = "feature_importance.png"
-            plt.savefig(importance_path)
-            mlflow.log_artifact(importance_path)
-            plt.close()
-            
-            # Log feature importance as dict
-            importance_dict = importance_df.set_index('feature')['importance'].to_dict()
-            mlflow.log_dict(importance_dict, "feature_importance.json")
-            
+            # ========== GUARDAR MODELO ==========
             # Create model signature
             signature = infer_signature(X_train, y_pred_scores[:len(X_train)])
             
@@ -338,6 +367,7 @@ class LeadScoringModel:
             # Save and log preprocessing artifacts
             preprocessing_info = {
                 'feature_names': self.feature_names,
+                'processed_feature_names': self.processed_feature_names,  # ← NUEVO
                 'scaler_mean': self.scaler.mean_.tolist(),
                 'scaler_scale': self.scaler.scale_.tolist(),
                 'approach': approach,
@@ -345,6 +375,7 @@ class LeadScoringModel:
             }
             mlflow.log_dict(preprocessing_info, "preprocessing_info.json")
             
+            # ========== COMPILAR RESULTADOS ==========
             # Compile metrics dictionary
             metrics = {
                 'accuracy': accuracy,
@@ -357,10 +388,11 @@ class LeadScoringModel:
                 'run_id': self.run_id
             }
             
-            if use_cv:
+            if use_cv and cv_mean is not None:
                 metrics['cv_accuracy_mean'] = cv_mean
                 metrics['cv_accuracy_std'] = cv_std
             
+            # ========== IMPRIMIR RESULTADOS ==========
             print("=" * 60)
             print("LEAD SCORING MODEL TRAINING RESULTS")
             print("=" * 60)
@@ -369,7 +401,7 @@ class LeadScoringModel:
             print(f"Accuracy: {metrics['accuracy']:.4f}")
             print(f"MAE (Mean Absolute Error): {metrics['mae']:.4f}")
             print(f"Cohen's Kappa (Quadratic): {metrics['cohen_kappa']:.4f}")
-            if use_cv:
+            if use_cv and cv_mean is not None:
                 print(f"CV Accuracy: {metrics['cv_accuracy_mean']:.4f} (+/- {metrics['cv_accuracy_std']:.4f})")
             print("\nClassification Report:")
             print(metrics['classification_report'])
@@ -412,16 +444,40 @@ class LeadScoringModel:
         return results
     
     def get_feature_importance(self, top_n: int = 15) -> pd.DataFrame:
-        """Get top N most important features"""
+        """
+        Get top N most important features.
+        
+        Args:
+            top_n: Number of top features to return
+        
+        Returns:
+            DataFrame with feature names and importance scores
+        """
         if self.model is None:
-            raise ValueError("Model not trained.")
+            raise ValueError("Model not trained yet.")
         
-        importance = pd.DataFrame({
-            'feature': self.feature_names,
-            'importance': self.model.feature_importances_
-        }).sort_values('importance', ascending=False).head(top_n)
+        # Obtener importancias del modelo
+        importances = self.model.feature_importances_
         
-        return importance
+        # Usar processed_feature_names si está disponible, si no usar feature_names
+        if self.processed_feature_names is not None:
+            feature_names = self.processed_feature_names
+        else:
+            feature_names = self.feature_names
+        
+        # Verificar consistencia
+        if len(feature_names) != len(importances):
+            print(f"⚠️ Warning: Feature mismatch. Using generic names.")
+            feature_names = [f"feature_{i}" for i in range(len(importances))]
+        
+        # Crear DataFrame
+        importance_df = pd.DataFrame({
+            'feature': feature_names,
+            'importance': importances
+        }).sort_values('importance', ascending=False)
+        
+        # Retornar top_n
+        return importance_df.head(top_n)
     
     def register_model(
         self, 
@@ -495,6 +551,7 @@ class LeadScoringModel:
         Returns:
             LeadScoringModel instance with loaded model
         """
+        #mlflow.set_tracking_uri(settings.MLFLOW_TRACKING_URI)  # For local file-based tracking
         model_uri = f"models:/{model_name}/{stage}"
         
         # Load the model
@@ -515,6 +572,7 @@ class LeadScoringModel:
             preprocessing_info = json.load(f)
         
         instance.feature_names = preprocessing_info['feature_names']
+        instance.processed_feature_names = preprocessing_info.get('processed_feature_names')
         
         # Reconstruct scaler
         instance.scaler = StandardScaler()
@@ -565,103 +623,3 @@ class LeadScoringModel:
             print()
 
 
-# ============================================================================
-# EXAMPLE USAGE WITH MLFLOW
-# ============================================================================
-
-def generate_sample_data(n_samples: int = 1000) -> Tuple[pd.DataFrame, pd.Series]:
-    """Generate synthetic lead data for demonstration"""
-    np.random.seed(42)
-    
-    data = {
-        'email_opens': np.random.poisson(5, n_samples),
-        'email_clicks': np.random.poisson(2, n_samples),
-        'page_views': np.random.poisson(10, n_samples),
-        'content_downloads': np.random.poisson(1, n_samples),
-        'demo_requested': np.random.binomial(1, 0.2, n_samples),
-        'pricing_page_visits': np.random.poisson(1, n_samples),
-        'case_study_views': np.random.poisson(1, n_samples),
-        'days_since_last_activity': np.random.exponential(10, n_samples),
-        'company_size': np.random.lognormal(4, 1.5, n_samples),
-        'annual_revenue': np.random.lognormal(15, 2, n_samples),
-        'is_decision_maker': np.random.binomial(1, 0.3, n_samples),
-        'job_level_score': np.random.randint(1, 6, n_samples),
-        'session_duration_avg': np.random.exponential(5, n_samples),
-        'pages_per_session': np.random.poisson(3, n_samples),
-        'return_visitor': np.random.binomial(1, 0.4, n_samples),
-    }
-    
-    X = pd.DataFrame(data)
-    
-    score_base = (
-        X['email_clicks'] * 0.3 +
-        X['demo_requested'] * 3 +
-        X['is_decision_maker'] * 2 +
-        X['pricing_page_visits'] * 0.5 +
-        np.log1p(X['company_size']) * 0.2 +
-        X['content_downloads'] * 0.4
-    )
-    
-    score_normalized = (score_base - score_base.min()) / (score_base.max() - score_base.min())
-    y = np.clip(np.round(score_normalized * 4 + 1), 1, 5).astype(int)
-    
-    return X, pd.Series(y)
-
-
-if __name__ == "__main__":
-    print("=" * 80)
-    print("LEAD SCORING MODEL WITH MLFLOW TRACKING")
-    print("=" * 80)
-    
-    # Generate sample data
-    print("\n📊 Generating sample lead data...")
-    X, y = generate_sample_data(n_samples=1000)
-    
-    print(f"Dataset shape: {X.shape}")
-    print(f"Score distribution:\n{y.value_counts().sort_index()}")
-    
-    # Train model with MLflow tracking
-    print("\n🚀 Training Lead Scoring Model with MLflow...")
-    model = LeadScoringModel(experiment_name="lead-scoring")
-    
-    metrics = model.train(
-        X, y, 
-        approach="ordinal", 
-        use_cv=True,
-        run_name="ordinal_v1",
-        tags={
-            "team": "data-science",
-            "environment": "development"
-        }
-    )
-    
-    # Register model
-    print("\n📦 Registering model in MLflow Model Registry...")
-    version = model.register_model(
-        model_name="lead-scoring-xgboost",
-        stage="Staging",
-        description="XGBoost ordinal classifier for 1-5 lead scoring"
-    )
-    
-    # Make predictions
-    print("\n🔮 Making predictions on sample leads...")
-    sample_leads = X.head(5)
-    predictions = model.predict_with_confidence(sample_leads)
-    print("\nPrediction Results:")
-    print(predictions)
-    
-    # Compare runs
-    print("\n📊 Comparing model runs...")
-    LeadScoringModel.compare_runs(experiment_name="lead-scoring", top_n=3)
-    
-    # Example: Load model from registry
-    print("\n📥 Loading model from registry...")
-    # loaded_model = LeadScoringModel.load_model_from_registry(
-    #     model_name="lead-scoring-xgboost",
-    #     stage="Staging"
-    # )
-    
-    print("\n" + "="*80)
-    print("✅ COMPLETE! View MLflow UI with: mlflow ui")
-    print("   Then navigate to: http://localhost:5000")
-    print("="*80)

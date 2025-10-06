@@ -12,6 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 # FastAPI
+import sys
 from functools import partial
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi import FastAPI
@@ -21,14 +22,35 @@ import logging
 
 # Salesforce API
 from .config.config import settings, APIMetadata, APIPolicies
+from .config.api_lifecycle import  APILifecycle
 from .config.middlewares import Middlewares, MiddlewareTools
 from .config.logger.factory import LoggingFactory
 from .routers.auth import VerifyAccess
 from .routers.health.health import HealthChecker
 from .routers.ml.routes import ComputeRouter
-#from .routers.data.write_to_db import WritetoDB
+from contextlib import asynccontextmanager
 
 logger: logging.Logger = LoggingFactory().get_logger()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan events: startup and shutdown"""
+    # Startup
+    logger.info("🚀 Starting Lead Scoring API...")
+    
+    try:
+        APILifecycle().load_model_from_registry()
+        logger.info("✅ Model loaded on startup")
+    except Exception as e:
+        logger.error(f"❌ Failed to load model on startup: {e}")
+        #sys.exit(1)
+    
+    yield
+    # Shutdown
+    logger.info("👋 Shutting down Lead Scoring API...")
+
+
 
 # Fastapi rct_api initialization
 api = FastAPI(
@@ -40,6 +62,7 @@ api = FastAPI(
     license_info=APIMetadata().license_info,
     openapi_tags=APIMetadata().tags_metadata,
     openapi_url=APIMetadata.openapi_url,
+    lifespan=lifespan
 )
 
 # Set API middlewares
@@ -53,11 +76,6 @@ api.include_router(health.router)
 
 compute_router = ComputeRouter( logger=logger)
 api.include_router(compute_router.router)
-#
-#
-#
-#write_to_db = WritetoDB(spark_session=spark, logger=logger)
-#rct_api.include_router(write_to_db.router)
 
 
 

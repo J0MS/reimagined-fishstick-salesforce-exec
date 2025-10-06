@@ -1,6 +1,7 @@
 version: "3.7"
 
 services:
+  # Salesforce Lead Inference service
   api:
     user: "appuser:appuser"
     build:
@@ -15,8 +16,7 @@ services:
       - ./src:/src/src
     ports:
       - 8000:8000
-    command: uvicorn src.main:api --reload --host 0.0.0.0 --port 8000
-
+    command: uvicorn src.main:api --reload --host 0.0.0.0 --port 8000    
 
 #  api_unit_test:
 #    build:
