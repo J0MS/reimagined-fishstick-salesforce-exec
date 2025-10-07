@@ -28,6 +28,7 @@ from .config.logger.factory import LoggingFactory
 from .routers.auth import VerifyAccess
 from .routers.health.health import HealthChecker
 from .routers.ml.routes import ComputeRouter
+from .routers.data.routes import DataRouter
 from contextlib import asynccontextmanager
 
 logger: logging.Logger = LoggingFactory().get_logger()
@@ -77,5 +78,7 @@ api.include_router(health.router)
 compute_router = ComputeRouter( logger=logger)
 api.include_router(compute_router.router)
 
+data_router = DataRouter( logger=logger)
+api.include_router(data_router.router)
 
 

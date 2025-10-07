@@ -21,7 +21,7 @@ class LeadScoringResponse(BaseModel):
 
     STATUS_CODE: int
     STATE: str
-    EXECUTION_ID: int
+    EXECUTION_ID: str
     INFERENCE_REPORT: Optional[LeadScoringOutput] = Field(
         None,
         title="lead scoring report",

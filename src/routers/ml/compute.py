@@ -26,85 +26,29 @@ from fastapi import (
     Depends,
 )
 
-#import pandas as pd
-#import numpy as np
-
+import uuid
+import numpy as np
+import pandas as pd
 import mlflow
+import xgboost as xgb
 import mlflow.xgboost
+from datetime import datetime
 from mlflow.tracking import MlflowClient
 
 from ...ml.lead_scoring_model_builder import LeadScoringModel
+from ...models.ml.lead_scoring_model import LeadScoringInput, LeadScoringOutput
 from ...models.request.request_model import LeadScoringRequest
 from ...models.responses.response_model import LeadScoringResponse
-from ...config.config import settings, LoggingFormatter, APIMetadata, APIPolicies
+from ...config.config import settings, LoggingFormatter, APIMetadata, APIPolicies, InferenceStatus
+from ...config.api_lifecycle import model_store as MODEL_STORE
 from ..errors import Exceptions
-
-#from ..data.data_access import DataAccess as DeltaRepository
 
 from ...config.logger.factory import LoggingFactory
 
-
 logger: logging.Logger = LoggingFactory.get_logger()
 
-
-
-class ModelStore:
-    model = None
-    model_version = None
-    feature_names = None
-    scaler_mean = None
-    scaler_scale = None
-    last_reload = None
-
-model_store = ModelStore()
-
-def load_model_from_registry():
-    """Load model from MLflow Model Registry"""
-    try:
-        MLFLOW_TRACKING_URI = settings.MLFLOW_TRACKING_URI
-        MODEL_NAME = settings.MODEL_NAME
-        MODEL_STAGE = settings.MODEL_STAGE
-        logger.info(f"Loading model: {MODEL_NAME} (stage: {MODEL_STAGE})")
-        
-        client = MlflowClient()
-        model_uri =MLFLOW_TRACKING_URI
-        
-        # Load the model
-        model = mlflow.xgboost.load_model(model_uri)
-        
-        # Get model version info
-        model_version = client.get_latest_versions(MODEL_NAME, stages=[MODEL_STAGE])[0]
-        run_id = model_version.run_id
-        
-        logger.info(f"Model version: {model_version.version}, Run ID: {run_id}")
-        
-        # Load preprocessing info
-        try:
-            artifacts_path = client.download_artifacts(run_id, "preprocessing_info.json")
-            with open(artifacts_path, 'r') as f:
-                preprocessing_info = json.load(f)
-            
-            model_store.feature_names = preprocessing_info['feature_names']
-            model_store.scaler_mean = np.array(preprocessing_info['scaler_mean'])
-            model_store.scaler_scale = np.array(preprocessing_info['scaler_scale'])
-            
-            logger.info(f"Loaded preprocessing info: {len(model_store.feature_names)} features")
-        except Exception as e:
-            logger.warning(f"Could not load preprocessing info: {e}")
-        
-        # Update model store
-        model_store.model = model
-        model_store.model_version = model_version.version
-        model_store.last_reload = datetime.utcnow()
-        
-        logger.info(f"✅ Model loaded successfully: {MODEL_NAME} v{model_version.version}")
-        
-        return True
-        
-    except Exception as e:
-        logger.error(f"❌ Error loading model: {str(e)}")
-        raise
-
+#Load model store
+model_store = MODEL_STORE
 
 @dataclass
 class ComputeLeads:
@@ -124,67 +68,137 @@ class ComputeLeads:
     ) -> LeadScoringResponse:
 
         """
-        Compute RCT design table
+        Compute Salesforce leads scoring values
 
         Parameters
         ----------
         request : str
             Request object, to capture headers
-        design_table_file: UploadFile
-            CSV File with experimental units data
-        experiment_data: Object with the following data:
-            - **EXP_NAME**: Experiment Name
-            - **EXP_STATUS**: Status of experiment
-            - **BLOCKING_FACTORS**: Blocking factors
-            - **EXPERIMENTAL_FACTORS**: Experimental factors
-            - **SCOPE_SIZE**: Scope size
-
+        scoring_request : LeadScoringRequest
+            LeadScoringRequest object with this definition:
+                LEAD_ID            Lead ID.
+                MARKET             Market/Country for this lead.
+                LEAD_PARAMETERS    Lead parameters, used for this inference.
 
         Returns
         -------
-        str
-            Job id of RCT algorithm execution
+        STATUS_CODE: int
+            HTTP code response
+        STATE: str
+            HTTP state response
+        EXECUTION_ID: str
+            Execution unique identifier
+        INFERENCE_REPORT: Optional[LeadScoringOutput]
+            Lead scoring inference report
         """
-        logger.info("Starting RCT")
+        logger.info("Starting Compute leads inference")
+
+
+        execution_id = str(uuid.uuid1())
+        logger.info(f"Execution id:{execution_id}")
+        
+
 
         try:
             # Inputs
 
-            logger.info(f"Input exp_obj:{LeadScoringRequest}")
+            logger.info(f"Input object:{LeadScoringRequest}")
+            
+            
+            try:
+                scoring_request_data = pd.DataFrame([scoring_request.model_dump()])
+                # Convert to numpy array 2D
+                input_data = scoring_request_data[['INFERENCE_PARAMETERS']].values[0][0]
+                input_data = pd.DataFrame([input_data]).to_dict()
+                input_data = pd.DataFrame(input_data).values
+            except Exception as e:
+                logger.error("❌ Unable load input data:", e)
+                
+            try:
+                model = MODEL_STORE.model
+                model_version = MODEL_STORE.model_version
+            except Exception as e:
+                logger.error("❌ Unable load model definition", e)
+
 
             try:
-                experiment_id = "RANDOM"
-          
+                                
+                try:
+                    # Intentar predecir directamente
+                    if hasattr(model, "predict"):
+                        try:
+                            dmatrix = xgb.DMatrix(input_data)
+                            inference = model.predict(dmatrix)
+                            
+                        except Exception as e:
+                            logger.error("❌ Prediction failed:", e)
+      
+                    else:
+                        logger.error("❌ Invalid model:", e)
+                        raise ValueError("Invalid model")
 
-                response = {
-                            "STATUS_CODE": 200,
-                            "STATE": experiment_id,
-                            "EXECUTION_ID": 100,
-                            "INFERENCE_REPORT": {"lead_score": 5,
-                                                 "confidence": 0.87,
-                                                 "probabilities": {"score_1": 0.02,"score_2": 0.03,"score_3": 0.05,"score_4": 0.03,"score_5": 0.87},
-                                                 "model_info": {"model_name": "lead-scoring-xgboost","version": "3","stage": "Production"},
-                                                 "prediction_timestamp": "2025-10-04T12:00:00Z"
-                                                 }
-                            }
+                except Exception as e:
+                    logger.error("❌ Broken model:", e)
+                    return LeadScoringResponse(
+                        STATUS_CODE=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        STATE=InferenceStatus.FAILED.value,
+                        EXECUTION_ID=execution_id,
+                        INFERENCE_REPORT=None
+                    )
+                #Building inference report
+                inference_report = LeadScoringOutput( 
+                    lead_score = inference.argmax(),
+                    confidence = inference.max(),
+                    probabilities = {f"score_{i+1}": float(v) for i, v in enumerate(inference[0])},
+                    model_info= {"model_name": "lead-scoring-xgboost","version": model_version,"stage": "Production"},
+                    prediction_timestamp= datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                )
+                
+                logger.info(f"Inference report:\n{inference_report.model_dump_json(indent=2)}")
+                #mlflow.set_tag("inference_report", inference_json)
+
+                
+                response = LeadScoringResponse(
+                    STATUS_CODE = int(status.HTTP_200_OK),
+                    STATE = InferenceStatus.SUCCESS.value,
+                    EXECUTION_ID = execution_id,
+                    INFERENCE_REPORT = inference_report
+                )
 
                 return response
 
             except Exception as e:
-                logger.error(Exceptions.BROKEN_PIPE.value)
+                logger.error(Exceptions.FAILED_INFERENCE.value)
+                error_response = LeadScoringResponse(
+                    STATUS_CODE=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    STATE=InferenceStatus.FAILED.value,
+                    EXECUTION_ID=execution_id,
+                    INFERENCE_REPORT=None
+                )
+
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=error_response.model_dump()
+                )
 
 
         except Exception as e:
-            logger.error(Exceptions.BROKEN_PIPE.value)
+            logger.error(f"{Exceptions.BROKEN_PIPE.value}, execution id {execution_id}" )
 
             properties = {"custom_dimensions": {"exception": str(e)}}
             logger.exception("Captured an exception.", extra=properties)
 
-            response = {
-                "message": Exceptions.BROKEN_PIPE,
-                "error": str(e),
-            }
+            error_response = LeadScoringResponse(
+                    STATUS_CODE=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    STATE=InferenceStatus.FAILED.value,
+                    EXECUTION_ID=execution_id,
+                    INFERENCE_REPORT=None
+                    )
 
-            return response
+            raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=error_response.model_dump()
+                    )
+
 
 

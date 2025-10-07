@@ -75,47 +75,15 @@ class APILifecycle:
                     break
 
             if model_key is None:
-                raise ValueError("No se encontró el archivo 'model.xgb' dentro de los artifacts de MLflow.")
+                raise ValueError("No available model inside MLflow artifacts.")
 
-            import numpy as np
-            import pandas as pd
-            # --- Descargar y cargar modelo XGBoost ---
+
+            # --- Load XGBoost model---
             with tempfile.NamedTemporaryFile() as tmp:
                 s3.download_fileobj(cls.aws_bucket, model_key, tmp)
                 tmp.seek(0)
                 booster = xgb.Booster()
                 booster.load_model(tmp.name)
-            
-                f = {'email_opens': {0: 5},
-                'email_clicks': {0: 0},
-                'page_views': {0: 7},
-                'content_downloads': {0: 3},
-                'demo_requested': {0: 0},
-                'pricing_page_visits': {0: 0},
-                'case_study_views': {0: 2},
-                'days_since_last_activity': {0: 4.555039840533683},
-                'company_size': {0: 35.20217516441934},
-                'annual_revenue': {0: 9512582.10732521},
-                'is_decision_maker': {0: 0},
-                'job_level_score': {0: 3},
-                'session_duration_avg': {0: 6.961331938543087},
-                'pages_per_session': {0: 4},
-                'return_visitor': {0: 0}}
-            
-                # Convertir a DataFrame
-                df = pd.DataFrame(f)
-
-                # Convertir a numpy array 2D
-                data = df.values  # shape (1, n_features)
-
-                #data = np.array([ f ])  # convertir a array 2D
-                dmatrix = xgb.DMatrix(data) 
-            
-                r =booster.predict(dmatrix)
-                logger.info("Result")
-                logger.info(r)
-                logger.info(r.shape)
-                logger.info( type(booster.predict(dmatrix)) )
             
             logger.info("Connected to MLflow server")
         

@@ -100,6 +100,12 @@ class Settings(BaseSettings):
     AWS_REGION: str
     AWS_BUCKET: str
     BUCKET_PREFIX: str
+    SNOWFLAKE_ACCOUNT: str
+    SNOWFLAKE_USER: str
+    SNOWFLAKE_PASSWORD: str
+    SNOWFLAKE_WAREHOUSE: str
+    SNOWFLAKE_DATABASE: str
+    SNOWFLAKE_SCHEMA: str
 
 
     class Config:
@@ -144,6 +150,13 @@ class RegisteredTeams(Enum):
     """
     Registered Team Codes
     """
-    CONSUMER = "Consumer"
+    MARKETING = "Marketing"
     SALES_FORCE = "SalesForce"
     OTHER = "Other"
+
+class InferenceStatus(Enum):
+    SUCCESS = "success"
+    FAILED = "failed"
+    PARTIAL = "partial"
+
+

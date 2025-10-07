@@ -20,8 +20,8 @@ class LeadScoringRequest(BaseModel):
 
     Attributes:
         LEAD_ID            Lead ID.
-        MARKET             Market/Country forr this lead.
-        LEAD_PARAMETERS    Lead parameters, used forr this execution.
+        MARKET             Market/Country for this lead.
+        LEAD_PARAMETERS    Lead parameters, used for this inference.
     """
 
     LEAD_ID: Optional[int] = Field(
