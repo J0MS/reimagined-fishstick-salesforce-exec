@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lead-score-platform
+  namespace: salesforce-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lead-score-platform
+  template:
+    metadata:
+      labels:
+        app: lead-score-platform
+    spec:
+      serviceAccountName: salesforce-prod
+      containers:
+      - name: lead-score-platform
+        image: 366553431290.dkr.ecr.us-east-1.amazonaws.com/salesforce/lead_score_platform:production
+        env:
+        - name: INSTRUMENTATION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: INSTRUMENTATION_KEY
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: JWT_SECRET
+        - name: ALGORITHM
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: ALGORITHM
+        - name: MLFLOW_TRACKING_URI
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: MLFLOW_TRACKING_URI
+        - name: MODEL_NAME
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: MODEL_NAME
+        - name: MODEL_STAGE
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: MODEL_STAGE
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_REGION
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: AWS_REGION
+        - name: AWS_BUCKET
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: AWS_BUCKET
+        - name: BUCKET_PREFIX
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: BUCKET_PREFIX
+        - name: SNOWFLAKE_ACCOUNT
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: SNOWFLAKE_ACCOUNT
+        - name: SNOWFLAKE_USER
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: SNOWFLAKE_USER
+        - name: SNOWFLAKE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: SNOWFLAKE_PASSWORD
+        - name: SNOWFLAKE_WAREHOUSE
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: SNOWFLAKE_WAREHOUSE
+        - name: SNOWFLAKE_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: SNOWFLAKE_DATABASE
+        - name: SNOWFLAKE_SCHEMA
+          valueFrom:
+            secretKeyRef:
+              name: salesforce-service-secrets
+              key: SNOWFLAKE_SCHEMA
+

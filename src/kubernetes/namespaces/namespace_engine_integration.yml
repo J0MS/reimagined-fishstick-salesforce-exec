@@ -1,0 +1,7 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: salesforce-lab-engine-integration
+  labels:
+    name: salesforce-lab-engine-integration
+spec: {}

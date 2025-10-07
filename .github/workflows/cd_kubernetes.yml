@@ -5,13 +5,13 @@ on:
     branches:
       - main
     paths:
-      - packages/API/kubernetes/**
+      - src/kubernetes/**
 
 env:
   # job working directory
   WORKING_DIR: ${{ github.workspace }}/packages/API/kubernetes
-  # azure
-  AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+  # aws
+  AWS_CREDENTIALS: ${{ secrets.AWS_CREDENTIALS }}
 
 jobs:
   audit-k8s:
@@ -51,7 +51,7 @@ jobs:
       name: Set the target Azure Kubernetes Service (AKS) cluster
       uses: Azure/aks-set-context@v1
       with:
-        creds: '${{ env.AZURE_CREDENTIALS }}'
+        creds: '${{ env.AWS_CREDENTIALS }}'
         resource-group: ${{ env.RESOURCE_GROUP }}
         cluster-name: ${{ env.CLUSTER_NAME }}
     -
@@ -63,7 +63,7 @@ jobs:
         manifests:
           ${{ env.WORKING_DIR }}
 
-  apply-qa:
+  apply-prod:
     needs: [apply-dev]
     runs-on: ubuntu-latest
     environment:

@@ -62,20 +62,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
 # CMD JSON recomendado para Kubernetes (recibir correctamente SIGTERM)
 CMD ["uvicorn", "src.main:api", "--host", "0.0.0.0", "--port", "8000"]
 
-# -------------------------------------------------------------------------
-# Testing stage
-# -------------------------------------------------------------------------
-FROM base AS testing
-USER root
-RUN pip install httpx pytest pytest-dotenv pytest-cov pytest-xdist pytest-mock
-COPY ./tests/ src/tests/
-COPY ./src src/src
 
-# Unit tests
-FROM testing AS unit_test
-CMD ["bash", "-c", "pytest --cov-config=.coveragerc src/tests/unit_test --junitxml=reports/unittest.xml --cov-report=xml:reports/coverage.xml --cov-report=html:reports/coverage_report.html --cov-report=term-missing --cov=src | tee reports/pytest-coverage.txt"]
-
-# Integration tests
-FROM testing AS integration_test
-CMD ["bash", "-c", "pytest --cov-config=.coveragerc src/tests/integration_test --junitxml=reports/integration.xml --cov-report term-missing --cov=src | tee reports/pytest-coverage.txt"]
 
