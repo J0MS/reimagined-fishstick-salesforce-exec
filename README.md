@@ -20,6 +20,9 @@ By José Manuel Martinez
 
 ## 🏗️ Architecture
 Architecture diagram of deployed solution in AWS
+> **Nota:** The infrastructure will be shut down until the day of the presentation to avoid charges while not in use.
+
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                         Amazon API Gateway                  │_______________ AWS Cloudwatch
