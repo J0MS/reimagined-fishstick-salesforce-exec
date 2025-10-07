@@ -1,59 +1,75 @@
 version: "3.7"
 
+# 🔧 Common variables
+x-common-env: &common-env
+  PYTHON_VERSION: "3.10"
+
 services:
   # Salesforce Lead Inference service
   api:
     user: "appuser:appuser"
     build:
-      target: production
       context: .
       dockerfile: Dockerfile.api
+      target: production
+      args:
+        PYTHON_VERSION: "3.10"
     container_name: api
     restart: always
     env_file:
       - .env
+    environment:
+      <<: *common-env
     volumes:
       - ./src:/src/src
     ports:
       - 8000:8000
-    command: uvicorn src.main:api --reload --host 0.0.0.0 --port 8000    
+    command: "uvicorn src.main:api --reload --host 0.0.0.0 --port 8000"
 
   api_unit_test:
     build:
-      target: unit_test
       context: .
       dockerfile: Dockerfile.api
+      target: unit_test
+      args:
+        PYTHON_VERSION: "3.10"
     container_name: api_unit_test
     env_file:
       - .env
+    environment:
+      <<: *common-env
     volumes:
       - ./reports/:/src/src/reports
       - ./tests:/src/src/tests
     ports:
       - 8000:8000
-    command: bash -c 'pytest --cov-config=.coveragerc src/tests/unit_test --cov-report term-missing --junitxml=reports/unittest-3.8.xml --cov-report=xml:reports/coverage-3.8.xml --cov-report=html:reports/coverage_report-3.8.xml --cov=src -v -n 3  && pytest --cov-config=.coveragerc src/tests/unit_test --junitxml=reports/pytest-3.8.xml --cov-report term-missing  --cov=src | tee reports/pytest-coverage-3.8.txt' 
-
+    command: >
+      bash -c "pytest --cov-config=.coveragerc src/tests/unit_test --cov-report term-missing --junitxml=reports/unittest-$$PYTHON_VERSION.xml --cov-report=xml:reports/coverage-$$PYTHON_VERSION.xml --cov-report=html:reports/coverage_report-$$PYTHON_VERSION.xml --cov=src -v -n 3 && pytest --cov-config=.coveragerc src/tests/unit_test --junitxml=reports/pytest-$$PYTHON_VERSION.xml --cov-report term-missing --cov=src | tee reports/pytest-coverage-$$PYTHON_VERSION.txt"
 
   api_integration_test:
     build:
-      target: integration_test
       context: .
+      dockerfile: Dockerfile.api
+      target: integration_test
+      args:
+        PYTHON_VERSION: "3.10"
     container_name: api_integration_test
     env_file:
       - .env
+    environment:
+      <<: *common-env
     volumes:
       - ./src:/src/src/src
       - ./tests:/src/src/tests
-    command: pytest --cov-config=.coveragerc --cov=. src/tests/integration_test --junitxml=junit/unittest-3.8.xml -v
+    command: >
+      bash -c "pytest --cov-config=.coveragerc --cov=. src/tests/integration_test --junitxml=junit/unittest-$$PYTHON_VERSION.xml -v"
 
 
-# Run API with:
-# 1) Installing testops_tools from remote repo:
-# docker-compose build && docker-compose up api
 
+# Run API with: 
+# 1) Installing testops_tools from remote repo: # docker-compose build && docker-compose up api 
 
-# Run tests with:
-# docker-compose build --build-arg JFROG_CONNECTION_STRING && docker-compose up api_unit_test
-# docker-compose build --build-arg JFROG_CONNECTION_STRING && time docker-compose up --force-recreate api_integration_test
-
-
+# Run tests with: 
+# docker-compose build --build-arg JFROG_CONNECTION_STRING && docker-compose up api_unit_test 
+# docker-compose build --build-arg JFROG_CONNECTION_STRING && time docker-compose up --force-recreate api_integration_test      
+            

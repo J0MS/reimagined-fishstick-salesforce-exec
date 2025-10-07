@@ -80,7 +80,7 @@ class APIPolicies:
     trace_id: str = "4bf92f3577b34da6a3ce929d0e0e4736"
     parent_span_id: str = "00f067aa0ba902b7"
     trace_flags: str = "01"
-    api_middlewares_exclusions: List = field(default_factory=lambda: ["/docs"])
+    api_middlewares_exclusions: List = field(default_factory=lambda: ["/docs", "/redoc", APIMetadata.openapi_url])
 
 
 class Settings(BaseSettings):

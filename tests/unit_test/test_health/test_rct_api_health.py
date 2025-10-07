@@ -14,14 +14,14 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from src.routers.health.health import HealthChecker
-from src.main import rct_api
+from src.main import api
 import logging
 
 # Instanciate app
 client = TestClient(api)
 
 
-@pytest.mark.rct_api
+@pytest.mark.api_core
 def test_health(payload_header_provider):
     """ Test response for /health path."""
     response = client.get(

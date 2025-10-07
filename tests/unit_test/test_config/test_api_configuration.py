@@ -33,7 +33,7 @@ def record_generator(level: str) -> logging.LogRecord:
 
 """ Testing APIMetadata class """
 class TestAPIMetadata:
-    @pytest.mark.rct_api
+    @pytest.mark.api_core
     def test_api_metadata(self, api_metadata_keys_provider):
         """ Test configuration for APIMetadata class."""
         
@@ -46,10 +46,19 @@ class TestSettings:
     def test_settings_attributes(self):
         settings = Settings()
 
-        assert hasattr(settings, 'TEST_OPS_API_URL')
-        assert hasattr(settings, 'INSTRUMENTATION_KEY')
-        assert isinstance(settings.TEST_OPS_API_URL, str)
-        assert isinstance(settings.INSTRUMENTATION_KEY, str)
+        vars_to_check = [
+            'INSTRUMENTATION_KEY', 'JWT_SECRET', 'ALGORITHM',
+            'MLFLOW_TRACKING_URI', 'MODEL_NAME', 'MODEL_STAGE',
+            'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_REGION',
+            'AWS_BUCKET', 'BUCKET_PREFIX',
+            'SNOWFLAKE_ACCOUNT', 'SNOWFLAKE_USER', 'SNOWFLAKE_PASSWORD',
+            'SNOWFLAKE_WAREHOUSE', 'SNOWFLAKE_DATABASE', 'SNOWFLAKE_SCHEMA'
+        ]
+
+        for var in vars_to_check:
+            assert hasattr(settings, var)
+            assert isinstance(getattr(settings, var), str)
+
 
     def test_settings_config_attributes(self):
         assert hasattr(Settings.Config, 'env_file')
@@ -61,23 +70,22 @@ class TestSettings:
 
 """ Testing APIPolicies class """
 class TestAPIPolicies:
-    @pytest.mark.rct_api
+    @pytest.mark.api_core
     def test_api_allowed_host_default_value(self):
         policies = APIPolicies()
         assert policies.api_allowed_host == ["*"]
 
-    @pytest.mark.rct_api
+    @pytest.mark.api_core
     def test_api_middlewares_exclusions_default_value(self):
         policies = APIPolicies()
         expected_exclusions = [
-            "/random-control-trial",
             "/docs",
             "/redoc",
             APIMetadata.openapi_url
         ]
         assert policies.api_middlewares_exclusions == expected_exclusions
 
-    @pytest.mark.rct_api
+    @pytest.mark.api_core
     def test_fields_annotations(self):
         annotations = {
             "api_allowed_host": List,
@@ -93,42 +101,42 @@ class TestAPIPolicies:
 
 """ Testing LoggingFormatter class """
 class TestLoggingFormatter:
-    @pytest.mark.rct_api
+    @pytest.mark.api_core
     def test_format_debug(self):
         formatter = LoggingFormatter()
         record = logging.LogRecord("test_logger", logging.DEBUG, "path/to/file.py", 42, "Debug message", None, None)
         formatted = formatter.format(record)
         assert formatted == f"\x1b[38;21mDEBUG: {record.asctime} - {record.msg} ({record.filename}:{record.lineno})\x1b[0m"
   
-    @pytest.mark.rct_api
+    @pytest.mark.api_core
     def test_format_info(self):
         formatter = LoggingFormatter()
         record = logging.LogRecord("test_logger", logging.INFO, "path/to/file.py", 42, "Info message", None, None)
         formatted = formatter.format(record)
         assert formatted == f"\x1b[1;32mINFO: {record.asctime} - {record.msg} ({record.filename}:{record.lineno})\x1b[0m"
 
-    @pytest.mark.rct_api
+    @pytest.mark.api_core
     def test_format_warning(self):
         formatter = LoggingFormatter()
         record = logging.LogRecord("test_logger", logging.WARNING, "path/to/file.py", 42, "Warning message", None, None)
         formatted = formatter.format(record)
         assert formatted == f"\x1b[33;21mWARNING: {record.asctime} - {record.msg} ({record.filename}:{record.lineno})\x1b[0m"
 
-    @pytest.mark.rct_api
+    @pytest.mark.api_core
     def test_format_error(self):
         formatter = LoggingFormatter()
         record = logging.LogRecord("test_logger", logging.ERROR, "path/to/file.py", 42, "Error message", None, None)
         formatted = formatter.format(record)
         assert formatted == f"\x1b[31;21mERROR: {record.asctime} - {record.msg} ({record.filename}:{record.lineno})\x1b[0m"
 
-    @pytest.mark.rct_api
+    @pytest.mark.api_core
     def test_format_critical(self):
         formatter = LoggingFormatter()
         record = logging.LogRecord("test_logger", logging.CRITICAL, "path/to/file.py", 42, "Critical message", None, None)
         formatted = formatter.format(record)
         assert formatted == f"\x1b[31;1mCRITICAL: {record.asctime} - {record.msg} ({record.filename}:{record.lineno})\x1b[0m"
 
-    @pytest.mark.rct_api
+    @pytest.mark.api_core
     @pytest.mark.parametrize("initial_level,final_level", [("DEBUG", 1), ("INFO", 2), ("WARNING", 3),("ERROR", 4),("CRITICAL", 5) ])
     def test_api_logging_formater(self, initial_level, final_level):
         """ Test configuration for API Logging formater class."""
