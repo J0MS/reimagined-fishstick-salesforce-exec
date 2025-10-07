@@ -1,18 +1,14 @@
 version: "3.7"
 
 services:
-  rct_api:
+  # Salesforce Lead Inference service
+  api:
     user: "appuser:appuser"
-    depends_on:
-      - redis
     build:
       target: production
       context: .
+      dockerfile: Dockerfile.api
     container_name: api
-    environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0   
-      - DOCKER_BUILDKIT=1
     restart: always
     env_file:
       - .env
@@ -20,15 +16,14 @@ services:
       - ./src:/src/src
     ports:
       - 8000:8000
-    command: uvicorn src.main:api --reload --host 0.0.0.0 --port 8000
-
+    command: uvicorn src.main:api --reload --host 0.0.0.0 --port 8000    
 
   api_unit_test:
     build:
       target: unit_test
       context: .
+      dockerfile: Dockerfile.api
     container_name: api_unit_test
-#    restart: always
     env_file:
       - .env
     volumes:
@@ -44,7 +39,6 @@ services:
       target: integration_test
       context: .
     container_name: api_integration_test
-#    restart: always
     env_file:
       - .env
     volumes:
@@ -55,7 +49,7 @@ services:
 
 # Run API with:
 # 1) Installing testops_tools from remote repo:
-# docker-compose build --build-arg JFROG_CONNECTION_STRING && docker-compose up api
+# docker-compose build && docker-compose up api
 
 
 # Run tests with:
