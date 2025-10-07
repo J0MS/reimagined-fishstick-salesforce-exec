@@ -62,7 +62,7 @@ class DataRetriever:
 
     async def retrieve(
         limit: int = 10
-    ) -> LeadScoringResponse:
+    ) :
 
         """
         Compute RCT design table
@@ -71,30 +71,24 @@ class DataRetriever:
         ----------
         request : str
             Request object, to capture headers
-        design_table_file: UploadFile
-            CSV File with experimental units data
-        experiment_data: Object with the following data:
-            - **EXP_NAME**: Experiment Name
-            - **EXP_STATUS**: Status of experiment
-            - **BLOCKING_FACTORS**: Blocking factors
-            - **EXPERIMENTAL_FACTORS**: Experimental factors
-            - **SCOPE_SIZE**: Scope size
-
 
         Returns
         -------
-        str
-            Job id of RCT algorithm execution
+        dict
+            Set of lead scores
         """
-        logger.info("Starting RCT")
+        logger.info("Starting data loading")
 
         try:
             with SnowflakeHandler().get_snowflake_connection() as conn:
                 cursor = conn.cursor()
+                cursor.execute("USE DATABASE SFTEST")
+                cursor.execute("USE SCHEMA PUBLIC")
+                
                 query = f"""
                     SELECT STATE, EXECUTION_ID, LEAD_SCORE, CONFIDENCE, 
                     MODEL_NAME, PREDICTION_TIMESTAMP, CREATED_AT
-                    FROM API_RESPONSES
+                    FROM PUBLIC.LEAD_SCORING_PLATFORM
                     ORDER BY CREATED_AT DESC
                     LIMIT {limit}
                 """
@@ -116,6 +110,7 @@ class DataRetriever:
             
                 return {"responses": responses}
         except Exception as e:
+            logger.error("❌ Unable to stablish connection:", e)
             raise HTTPException(status_code=500, detail=str(e))
 
 

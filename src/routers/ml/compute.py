@@ -41,6 +41,7 @@ from ...models.request.request_model import LeadScoringRequest
 from ...models.responses.response_model import LeadScoringResponse
 from ...config.config import settings, LoggingFormatter, APIMetadata, APIPolicies, InferenceStatus
 from ...config.api_lifecycle import model_store as MODEL_STORE
+from ...routers.data.connection_handler import SnowflakeHandler
 from ..errors import Exceptions
 
 from ...config.logger.factory import LoggingFactory
@@ -147,7 +148,7 @@ class ComputeLeads:
                     )
                 #Building inference report
                 inference_report = LeadScoringOutput( 
-                    lead_score = inference.argmax(),
+                    lead_score = inference.argmax() + 1,
                     confidence = inference.max(),
                     probabilities = {f"score_{i+1}": float(v) for i, v in enumerate(inference[0])},
                     model_info= {"model_name": "lead-scoring-xgboost","version": model_version,"stage": "Production"},
@@ -164,6 +165,16 @@ class ComputeLeads:
                     EXECUTION_ID = execution_id,
                     INFERENCE_REPORT = inference_report
                 )
+                
+                try:
+                    SnowflakeHandler.insert(response)
+                    logger.info({
+                        "status": "success",
+                        "message": "Response stored successfully in Snowflake",
+                        "execution_id": response.EXECUTION_ID
+                        })
+                except HTTPException as he:
+                    logger.error(f"{Exceptions.FAILED_INSERTION.value}, execution id {execution_id}" )
 
                 return response
 

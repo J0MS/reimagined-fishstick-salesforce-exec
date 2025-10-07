@@ -1,7 +1,7 @@
 """
-Unit test RCT API health
+Unit test for API health endpoint
 
-Copyright 2023 Anheuser Busch InBev Inc.
+Copyright 2025 Salesforce Inc.
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +18,7 @@ from src.main import rct_api
 import logging
 
 # Instanciate app
-client = TestClient(rct_api)
+client = TestClient(api)
 
 
 @pytest.mark.rct_api

@@ -17,7 +17,7 @@ class Exceptions(Enum):
     FAILED_INSERTION = 'Failed insert in database'
     FAILED_ACCESS = 'Access attempt forbidden, missed or invalid token'
     FAILED_DECODE = 'Failed token access decode'
-    FAILED_INFERENCE = 'Imposible calculate inference, bad response object'
+    FAILED_INFERENCE = 'Imposible return inference, bad response object'
     FAILED_TOKEN_VERIFICATION = 'Token access verfication failed '
     INVALID_CREDENTIALS = 'Missed or invalid tokens'
     INVALID_AUTH_SCHEME = 'Invalid auth scheme'

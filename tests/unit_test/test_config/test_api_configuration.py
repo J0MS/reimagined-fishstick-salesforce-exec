@@ -1,7 +1,7 @@
-""" 
-Unit test RCT API  configurations
+"""
+Salesforce Testcases for middleware
 
-Copyright 2023 Anheuser Busch InBev Inc.
+Copyright 2025 Salesforce Inc.
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
