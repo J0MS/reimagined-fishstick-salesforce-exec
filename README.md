@@ -49,7 +49,7 @@ Architecture diagram of deployed solution in AWS
     ┌─────────▼────────────────────────────────┐
     │                                          │
     │         SnowflakeDB (Port 5432)          │
-    │         MLflow Metadata Store            │
+    │         Predictions Store                │
     │                                          │
     └──────────────────────────────────────────┘
  
