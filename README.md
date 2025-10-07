@@ -1,39 +1,55 @@
 # Salesforce Lead Scoring Platform with MLflow & FastAPI
 
-Complete production-ready machine learning platform for lead scoring (1-5 scale) with MLflow model registry and FastAPI microservice architecture.
+Welcome to Salesforce production-ready  lead scoring platform (1-5 scale) with MLflow model registry and FastAPI microservice architecture.
+
+By José Manuel Martinez
+
+
+
+
+| Version  | Sonnar Cloud               | Snyk Status               | Apiiro Status         | Runtime version   | Deployment Status  |
+|-----------------|----------------------------| --------------------------|-----------------------|-------------------|--------------------|
+| v 0.1 | [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=salesforce_scoring-leads_tools&metric=bugs&token=c42d76e8b9099a3fe09906fba8c58b02a3d046fd)](https://sonarcloud.io/summary/new_code?id=salesforce_scoring-leads_tools) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=salesforce_scoring-leads_tools&metric=coverage&token=c42d76e8b9099a3fe09906fba8c58b02a3d046fd)](https://sonarcloud.io/summary/new_code?id=salesforce_scoring-leads_tools) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=salesforce_scoring-leads_tools&metric=alert_status&token=c42d76e8b9099a3fe09906fba8c58b02a3d046fd)](https://sonarcloud.io/summary/new_code?id=salesforce_scoring-leads_tools) [![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=salesforce_scoring-leads_tools&metric=duplicated_lines_density&token=c42d76e8b9099a3fe09906fba8c58b02a3d046fd)](https://sonarcloud.io/summary/new_code?id=salesforce_scoring-leads_tools) | <a href="https://app.snyk.io/org/analytics-pui/reporting?context[page]=issues-detail&project_target=%255B%2522salesforce%252Fscoring-leads%2522%255D&project_origin=%255B%2522github%2522%255D&issue_status=%255B%2522Open%2522%255D&issue_by=Severity&table_issues_detail_cols=SEVERITY%257CSCORE%257CCVE%257CCWE%257CPROJECT%257CEXPLOIT%2520MATURITY%257CCOMPUTED%2520FIXABILITY%257CINTRODUCED%257CSNYK%2520PRODUCT&v=1" style="margin-lef: 10px;"> <img src="https://snyk.io/advisor/images/snyk-poweredby.svg" width="100" height="22" > </a> | <a href="https://app.apiiro.com/profiles/repositories/c362b963-c839-4fdb-9533-2a9239783ff6/" style="margin-lef: 10px;"> <img src="https://apiiro.com/wp-content/themes/apiirov2/assets/img/logo-gradient.svg" width="100" height="22" alt="apiiro-badge"/> </a> | <img src="https://img.shields.io/badge/Python-3.9.16-green?logo=python"> | [![CD:SCORING-LEADS-ENGINE](https://github.com/salesforce/scoring-leads/actions/workflows/cd_scoring_leads_engine.yml/badge.svg)](https://github.com/salesforce/scoring-leads/actions/workflows/cd_scoring_leads_engine.yml) |
+
+
+
+
+
+
+# Table of Contents
 
 ## 🏗️ Architecture
-
+Architecture diagram of deployed solution in AWS
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         Nginx (Port 80)                      │
-│                    Reverse Proxy & Load Balancer             │
+│                         Amazon API Gateway                  │_______________ AWS Cloudwatch
+│                    Auth handler & API publishing            │
+└─────────────────────────────────────┬───────────────────────┘
+                                      │
+                                      │
+┌─────────────────────────────────────────────────────────────┐
+│                         Amazon EKS (Port 80)                │
+│                    Reverse Proxy & Load Balancer            │
 └─────────────┬───────────────────────┬───────────────────────┘
               │                       │
               │                       │
-    ┌─────────▼─────────┐   ┌────────▼──────────┐
+    ┌─────────▼─────────┐   ┌─────── ─▼─────────┐
     │   FastAPI API     │   │   MLflow Server   │
-    │   (Port 8000)     │   │   (Port 5000)     │
-    │                   │   │                   │
-    │ • Lead Scoring    │   │ • Model Registry  │
-    │ • Model Loading   │   │ • Experiment      │
+    │   (Port 8000)     │   │   (Port 5000)     │────AWS S3 (Artifacts store)
+    │                   │───│                   │
+    │ • Lead Scoring    │   │ • Model Registry  │────AWS RDS (MLFlow backed store)
+    │ • Model Loading   │───│ • Experiment      │─────────────────────────────────────── AWS Secrets Manager
     │ • Predictions     │   │   Tracking        │
-    └─────────┬─────────┘   └────────┬──────────┘
-              │                      │
-              │                      │
-    ┌─────────▼──────────────────────▼──────────┐
-    │                                            │
-    │         DuckDB (Port 5432)                 │
-    │         MLflow Metadata Store              │
-    │                                            │
-    └────────────────────────────────────────────┘
-              │
-              │
-    ┌─────────▼──────────────────────┐
-    │     MinIO (Port 9000/9001)     │
-    │     S3-Compatible Storage      │
-    │     MLflow Artifacts           │
-    └────────────────────────────────┘
+    └─────────┬─────────┘   └───────────────────┘
+              │                      
+              │                      
+    ┌─────────▼────────────────────────────────┐
+    │                                          │
+    │         SnowflakeDB (Port 5432)          │
+    │         MLflow Metadata Store            │
+    │                                          │
+    └──────────────────────────────────────────┘
+ 
 ```
 
 ## 📋 Prerequisites
@@ -43,7 +59,70 @@ Complete production-ready machine learning platform for lead scoring (1-5 scale)
 - 4GB RAM minimum
 - 10GB disk space
 
-## 🚀 Quick Start
+## 🚀 Development procedure
+### I : Model
+#### 1.1. Training Scripts
+
+```bash
+sagemaker_train.py - Model adaptation for SageMaker
+sagemaker_inference.py - Endpoint inference handler
+```
+
+#### 1.2. Deployment Management
+
+```
+sagemaker_deployment.py - Class for training and deploying salesforce XGBoost model
+Support for blue/green deployments
+Zero downtime endpoint updates
+```
+#### 1.3. Monitoring and Drift Detection
+```
+sagemaker_model_monitor.py - Continuous monitoring system
+Automatic drift detection with configurable thresholds
+Complete automatic retraining pipeline
+```
+
+#### 1.3.4 Infrastructure as Code
+
+```
+terraform_infrastructure.tf provide definitions for all platform coomponents
+```
+
+Witth this implementation, the training and monitoring flow works as follows:
+
+```mermaid
+graph TD
+    A[1. CONTINUOUS MONITORING<br/>Every hour] --> A1[SageMaker Model Monitor<br/>analyzes input data]
+    A1 --> A2[Compares against<br/>established baseline]
+    A2 --> A3[Detects drift in features<br/>or distributions]
+    
+    A3 --> B[2. DRIFT DETECTION<br/>Threshold: 15%]
+    B --> B1[CloudWatch Alarm<br/>triggers]
+    B1 --> B2[SNS sends<br/>notification]
+    B2 --> B3[Lambda auto-retrain<br/>executes]
+    
+    B3 --> C[3. AUTOMATED RETRAINING]
+    C --> C1[Lambda starts<br/>SageMaker Training Job]
+    C1 --> C2[Trains with updated<br/>data in S3]
+    C2 --> C3[Validates performance<br/>metrics]
+    C3 --> C4[EventBridge detects<br/>completion]
+    
+    C4 --> D[4. AUTOMATED DEPLOYMENT<br/>Blue/Green]
+    D --> D1[Lambda auto-deploy<br/>executes]
+    D1 --> D2[Creates new model and<br/>endpoint config]
+    D2 --> D3[Updates endpoint with<br/>zero downtime]
+    D3 --> D4[Notifies success/failure<br/>via SNS]
+    
+    D4 --> A
+    
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#ffe1f5
+    style D fill:#e1ffe1
+```
+
+## 🚀 Running the platform
+
 
 ### 1. Clone and Setup
 
@@ -54,14 +133,6 @@ cd salesforce-lead-scoring-platform
 
 # Create directories
 git clone git@github.com:J0MS/reimagined-fishstick-salesforce-exec.git
-
-# Copy files to appropriate directories
-# - docker-compose.yml → root
-# - mlflow-server/Dockerfile → mlflow-server/
-# - fastapi-service/Dockerfile → fastapi-service/
-# - fastapi-service/requirements.txt → fastapi-service/
-# - fastapi-service/app/main.py → fastapi-service/app/
-# - nginx/nginx.conf → nginx/
 ```
 
 ### 2. Environment Configuration
@@ -70,44 +141,25 @@ git clone git@github.com:J0MS/reimagined-fishstick-salesforce-exec.git
 # Copy environment template
 cp .env.example .env
 
-# Edit .env with your configurations
-nano .env
 ```
 
-### 3. Start Services
+### 3. Running
 
+**Running app**
 ```bash
-# Build and start all services
-make build
-make up
-
-# Or with docker-compose directly
-docker-compose build && docker-compose up api mlflow-server
+docker-compose build && docker-compose up api 
 ```
 
-### 4. Verify Services
-
+**Running unit test**
 ```bash
-# Check service health
-make health
-
-# Or manually
-curl http://localhost:8000/health
-curl http://localhost:5000/health
+docker-compose build --build-arg JFROG_CONNECTION_STRING && docker-compose up api_unit_test 
 ```
+
+
 
 Aditionally, check Swagger documentation on ```bash http://0.0.0.0:8000/docs```
+<img width="1546" height="883" alt="image" src="https://github.com/user-attachments/assets/18fdea53-c8ca-4d25-a030-00f055ccfe24" />
 
-## 📍 Service URLs
-
-| Service | URL | Description |
-|---------|-----|-------------|
-| FastAPI API | http://localhost:8000 | Lead scoring API |
-| API Documentation | http://localhost:8000/docs | Interactive Swagger UI |
-| MLflow UI | http://localhost:5000 | Model registry & experiments |
-| MinIO Console | http://localhost:9001 | S3 storage management |
-| Nginx (API) | http://localhost/api | Reverse proxy to FastAPI |
-| Nginx (MLflow) | http://localhost/mlflow | Reverse proxy to MLflow |
 
 
 ### Making Predictions
@@ -121,57 +173,27 @@ curl -X 'POST' \
   -d '{
   "LEAD_ID": 0,
   "MARKET": "string",
-  "LEAD_PARAMETERS": [{
-                "email_opens": 10,
-                "email_clicks": 5,
-                "page_views": 25,
-                "content_downloads": 3,
-                "demo_requested": 1,
-                "pricing_page_visits": 4,
-                "case_study_views": 2,
-                "days_since_last_activity": 2.5,
-                "company_size": 500,
-                "annual_revenue": 5000000,
-                "is_decision_maker": 1,
-                "job_level_score": 4,
-                "session_duration_avg": 8.5,
-                "pages_per_session": 5,
-                "return_visitor": 1
-            }]
-}'
+  "INFERENCE_PARAMETERS": {
+    "annual_revenue": 5000000,
+    "case_study_views": 2,
+    "company_size": 500,
+    "content_downloads": 3,
+    "days_since_last_activity": 2.5,
+    "demo_requested": 1,
+    "email_clicks": 5,
+    "email_opens": 10,
+    "is_decision_maker": 1,
+    "job_level_score": 4,
+    "page_views": 25,
+    "pages_per_session": 5,
+    "pricing_page_visits": 4,
+    "return_visitor": 1,
+    "session_duration_avg": 8.5
+  }
+}
 ```
 
-### Managing Models
 
-```bash
-# List registered models
-make model-list
-
-# Promote model to production
-make model-promote
-
-# Reload model in API (after promotion)
-make model-reload
-```
-
-## 🛠️ Makefile Commands
-
-```bash
-make help           # Show all available commands
-make build          # Build Docker images
-make up             # Start all services
-make down           # Stop all services
-make restart        # Restart services
-make logs           # View all logs
-make logs-api       # View FastAPI logs
-make logs-mlflow    # View MLflow logs
-make clean          # Remove containers & volumes
-make train          # Train new model
-make test           # Run tests
-make health         # Check service health
-make ps             # Show running containers
-make urls           # Display all service URLs
-```
 
 ## 🔄 Model Deployment Workflow
 
@@ -189,20 +211,16 @@ make train
 ### 3. Promote to Production
 ```bash
 # Promote specific version to Production
-make model-promote
-# Enter version number when prompted
 ```
 
 ### 4. Reload in API
 ```bash
 # API will automatically load new production model
-make model-reload
 ```
 
 ### 5. Verify
 ```bash
 # Check model info
-curl http://localhost:8000/model/info
 ```
 
 ## 📊 Monitoring & Observability
@@ -217,226 +235,15 @@ docker-compose logs -f api
 docker-compose logs -f mlflow-server
 ```
 
-### Container Status
-```bash
-make ps
-# Or
-docker-compose ps
-```
-
-### Resource Usage
-```bash
-docker stats
-```
-
-## 🧪 Testing
-
-### API Tests
-```bash
-# Run all tests
-make test
-
-# Run specific test
-docker-compose exec fastapi-service pytest tests/test_api.py -v
-```
-
-### Manual Testing
-```bash
-# Health check
-curl http://localhost:8000/health
-
-# Model info
-curl http://localhost:8000/model/info
-
-# Single prediction
-curl -X POST http://localhost:8000/predict \
-  -H "Content-Type: application/json" \
-  -d @sample_lead.json
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-Key environment variables in `.env`:
-
-```bash
-# MLflow
-MLFLOW_TRACKING_URI=http://mlflow-server:5000
-MODEL_NAME=lead-scoring-xgboost
-MODEL_STAGE=Production
-
-# API
-API_WORKERS=4
-LOG_LEVEL=INFO
-
-# Database
-POSTGRES_PASSWORD=mlflow_password
-
-# Storage
-MINIO_ROOT_PASSWORD=minio_password
-```
-
-### Scaling FastAPI
-
-Edit `docker-compose.yml`:
-
-```yaml
-fastapi-service:
-  environment:
-    API_WORKERS: 8  # Increase workers
-  deploy:
-    replicas: 3  # Multiple containers
-```
-
-## 🐛 Troubleshooting
-
-### MLflow Server Not Starting
-
-```bash
-# Check PostgreSQL is healthy
-docker-compose ps postgres
-
-# Check logs
-docker-compose logs mlflow-server
-
-# Restart
-docker-compose restart mlflow-server
-```
-
-### Model Not Loading in API
-
-```bash
-# Check MLflow connection
-curl http://localhost:5000/health
-
-# Check model exists
-curl http://localhost:5000/api/2.0/mlflow/registered-models/get?name=lead-scoring-xgboost
-
-# Force reload
-make model-reload
-```
-
-### MinIO Connection Issues
-
-```bash
-# Check MinIO is running
-docker-compose ps minio
-
-# Verify bucket exists
-docker-compose exec minio-client mc ls myminio
-
-# Create bucket manually
-docker-compose exec minio-client mc mb myminio/mlflow
-```
-
-### Database Connection Issues
-
-```bash
-# Check PostgreSQL
-docker-compose exec postgres psql -U mlflow -d mlflow
-
-# Run migrations
-make db-migrate
-```
-
-## 🚀 Production Deployment
-
-### Security Hardening
-
-1. **Change Default Passwords**
-```bash
-# Update in .env
-POSTGRES_PASSWORD=<strong-password>
-MINIO_ROOT_PASSWORD=<strong-password>
-```
-
-2. **Enable HTTPS**
-```bash
-# Generate SSL certificates
-mkdir -p nginx/ssl
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout nginx/ssl/key.pem \
-  -out nginx/ssl/cert.pem
-
-# Uncomment HTTPS server in nginx.conf
-```
-
-3. **Add API Authentication**
-- Implement JWT tokens
-- Add API key validation
-- Rate limiting (already configured in Nginx)
-
-### Resource Limits
-
-Add to `docker-compose.yml`:
-
-```yaml
-services:
-  fastapi-service:
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          cpus: '1'
-          memory: 1G
-```
-
-### Backup Strategy
-
-```bash
-# Backup PostgreSQL
-docker-compose exec postgres pg_dump -U mlflow mlflow > backup.sql
-
-# Backup MinIO
-docker-compose exec minio-client mc mirror myminio/mlflow /backup/mlflow
-```
-
-## 📚 API Documentation
-
-Full API documentation available at:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-
-### Key Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/model/info` | GET | Current model info |
-| `/model/reload` | POST | Reload model from registry |
-| `/predict` | POST | Single lead prediction |
-| `/predict/batch` | POST | Batch predictions |
-| `/mlflow/experiments` | GET | List MLflow experiments |
-| `/mlflow/models` | GET | List registered models |
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
-## 🆘 Support
-
-For issues and questions:
-- Open an issue on GitHub
-- Check MLflow docs: https://mlflow.org/docs/latest/
-- Check FastAPI docs: https://fastapi.tiangolo.com/
-
 ## 🎯 Next Steps
 
 - [ ] Add authentication & authorization
 - [ ] Implement model A/B testing
-- [ ] Add Prometheus metrics
-- [ ] Set up CI/CD pipeline
+- [ ] Add K8S metrics
+- [ ] Set up complete CI/CD pipeline
 - [ ] Add model drift detection
 - [ ] Implement feature store
-- [ ] Add Kubernetes deployment configs
+- [ ] Complete Kubernetes deployment configs
+- [ ] Complete Unit & Integration test
+- [ ] Set up sonnar cloud analysis
+
